@@ -1,5 +1,6 @@
 acmeserv.image
 acmeserv.kernel
+linux/
 linux-*/
 linux-*.tar.xz
 .*.swp
