@@ -1,0 +1,6 @@
+acmeserv.image
+acmeserv.kernel
+linux-*/
+linux-*.tar.xz
+.*.swp
+init
