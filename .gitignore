@@ -1,7 +1,16 @@
 acmeserv.image
 acmeserv.kernel
+iucv/.*.cmd
+iucv/.tmp_versions
+iucv/*.ko
+iucv/*.mod.c
+iucv/*.mod
+iucv/*.o
+iucv/modules.*
+iucv/Module.symvers
 linux/
 linux-*/
 linux-*.tar.xz
-.*.swp
+linux.config.old
+.*.sw?
 init
