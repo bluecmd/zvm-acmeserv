@@ -16,15 +16,17 @@ linux:
 	tar -xvf linux-5.8.3.tar.xz
 	mv linux-5.8.3 linux
 	rm linux/net/iucv/af_iucv.c
+	rm linux/include/net/iucv/af_iucv.h
 	ln -sf ../../../iucv/af_iucv.c linux/net/iucv/af_iucv.c
+	ln -sf ../../../../iucv/af_inet.h linux/include/net/iucv/af_iucv.h
 
-acmeserv.kernel: linux linux.config iucv/af_iucv.c
+acmeserv.kernel: linux linux.config iucv/af_iucv.c iucv/af_iucv.h
 	make -C linux/ ARCH=s390 CROSS_COMPILE=s390x-linux-gnu- KCONFIG_CONFIG=$(ABS_ROOT_DIR)/linux.config -j$(shell nproc)
 	cp linux/arch/s390/boot/bzImage $@
 
 # Unused, due to error:
 # [    1.762486] module af_iucv: relocation error for symbol  (r_type 5, value 0xffffffe080126256)
-iucv/af_iucv.ko: iucv/af_iucv.c
+iucv/af_iucv.ko: iucv/af_iucv.c iucv/af_iucv.h
 	$(MAKE) -C "linux" \
 		CROSS_COMPILE=s390x-linux-gnu- \
 		ARCH=s390 \
