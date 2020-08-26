@@ -8,7 +8,7 @@ test: acmeserv.kernel acmeserv.image acmeserv.cmdline
 init: $(wildcard *.go)
 	GOARCH=s390x go build -o $@
 
-acmeserv.image: init iucv/af_iucv.ko
+acmeserv.image: init
 	ls -d iucv $^ | cpio -v -H newc -o -R root:root | gzip -9 > $@
 
 linux:
@@ -18,10 +18,12 @@ linux:
 	rm linux/net/iucv/af_iucv.c
 	ln -sf ../../../iucv/af_iucv.c linux/net/iucv/af_iucv.c
 
-acmeserv.kernel: linux linux.config
+acmeserv.kernel: linux linux.config iucv/af_iucv.c
 	make -C linux/ ARCH=s390 CROSS_COMPILE=s390x-linux-gnu- KCONFIG_CONFIG=$(ABS_ROOT_DIR)/linux.config -j$(shell nproc)
 	cp linux/arch/s390/boot/bzImage $@
 
+# Unused, due to error:
+# [    1.762486] module af_iucv: relocation error for symbol  (r_type 5, value 0xffffffe080126256)
 iucv/af_iucv.ko: iucv/af_iucv.c
 	$(MAKE) -C "linux" \
 		CROSS_COMPILE=s390x-linux-gnu- \
