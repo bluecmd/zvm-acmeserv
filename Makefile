@@ -18,7 +18,7 @@ linux:
 	rm linux/net/iucv/af_iucv.c
 	rm linux/include/net/iucv/af_iucv.h
 	ln -sf ../../../iucv/af_iucv.c linux/net/iucv/af_iucv.c
-	ln -sf ../../../../iucv/af_inet.h linux/include/net/iucv/af_iucv.h
+	ln -sf ../../../../iucv/af_iucv.h linux/include/net/iucv/af_iucv.h
 
 acmeserv.kernel: linux linux.config iucv/af_iucv.c iucv/af_iucv.h
 	make -C linux/ ARCH=s390 CROSS_COMPILE=s390x-linux-gnu- KCONFIG_CONFIG=$(ABS_ROOT_DIR)/linux.config -j$(shell nproc)

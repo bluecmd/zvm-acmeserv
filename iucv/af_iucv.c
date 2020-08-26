@@ -50,6 +50,7 @@ static const u8 iprm_shutdown[8] =
 	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
 
 #define TRGCLS_SIZE	sizeof_field(struct iucv_message, class)
+#define SND2WAY_SIZE	sizeof(struct iucv_snd2way)
 
 #define __iucv_sock_wait(sk, condition, timeo, ret)			\
 do {									\
@@ -934,6 +935,7 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	char appl_id[9];
 	int err;
 	int noblock = msg->msg_flags & MSG_DONTWAIT;
+	struct iucv_snd2way *s2w = NULL;
 
 	err = sock_error(sk);
 	if (err)
@@ -991,6 +993,17 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 
 			break;
 
+		case SCM_IUCV_SND2WAY:
+			if (cmsg->cmsg_len != CMSG_LEN(SND2WAY_SIZE)) {
+				err = -EINVAL;
+				goto out;
+			}
+			s2w = CMSG_DATA(cmsg);
+			if (s2w->answer == NULL || s2w->asize == 0) {
+				err = -EINVAL;
+				goto out;
+			}
+			break;
 		default:
 			err = -EINVAL;
 			goto out;
@@ -1047,6 +1060,10 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	IUCV_SKB_CB(skb)->tag = txmsg.tag;
 
 	if (iucv->transport == AF_IUCV_TRANS_HIPER) {
+		if (s2w) {
+			err = -EINVAL;
+			goto fail;
+		}
 		atomic_inc(&iucv->msg_sent);
 		err = afiucv_hs_send(&txmsg, sk, skb, 0);
 		if (err) {
@@ -1058,6 +1075,10 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 
 		if (((iucv->path->flags & IUCV_IPRMDATA) & iucv->flags) &&
 		    skb->len <= 7) {
+			if (s2w) {
+				err = -EINVAL;
+				goto fail;
+			}
 			err = iucv_send_iprm(iucv->path, &txmsg, skb);
 
 			/* on success: there is no message_complete callback */
@@ -1089,12 +1110,29 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 					(u32)(addr_t)skb_frag_address(frag);
 				iba[i + 1].length = (u32)skb_frag_size(frag);
 			}
-			err = pr_iucv->message_send(iucv->path, &txmsg,
-						    IUCV_IPBUFLST, 0,
-						    (void *)iba, skb->len);
+			if (s2w) {
+        err = -ENOTSUPP;
+        goto fail;
+			} else {
+				err = pr_iucv->message_send(iucv->path, &txmsg,
+							    IUCV_IPBUFLST, 0,
+							    (void *)iba,
+							    skb->len);
+			}
 		} else { /* non-IPRM Linear skb */
-			err = pr_iucv->message_send(iucv->path, &txmsg,
-					0, 0, (void *)skb->data, skb->len);
+			if (s2w) {
+        printk(KERN_ERR "send2way called: data=%px size=%u\n", skb->data, skb->len);
+        char test[8] = {0};
+				err = pr_iucv->message_send2way(
+				    iucv->path, &txmsg, 0, 0, (void *)skb->data,
+				    skb->len, test, 8, NULL);
+        // TODO: Wait for reply before returning to user
+			} else {
+				err = pr_iucv->message_send(iucv->path, &txmsg,
+							    0, 0,
+							    (void *)skb->data,
+							    skb->len);
+			}
 		}
 		if (err) {
 			if (err == 3) {
@@ -1751,6 +1789,8 @@ static void iucv_callback_txdone(struct iucv_path *path,
 	struct sk_buff *list_skb;
 	unsigned long flags;
 
+  printk(KERN_ERR "iucv_callback_txdone called for %px\n", msg);
+
 	bh_lock_sock(sk);
 
 	spin_lock_irqsave(&list->lock, flags);
@@ -1783,6 +1823,12 @@ static void iucv_callback_txdone(struct iucv_path *path,
 static void iucv_callback_connrej(struct iucv_path *path, u8 ipuser[16])
 {
 	struct sock *sk = path->private;
+  unsigned char user_data[17];
+  memcpy(user_data, ipuser, 16);
+  user_data[16] = 0;
+  EBCASC(user_data, 16);
+  printk(KERN_ERR "iucv_callback_connrej executing for path=%d, userdata='%s'\n",
+      (int)path->pathid, user_data);
 
 	if (sk->sk_state == IUCV_CLOSED)
 		return;

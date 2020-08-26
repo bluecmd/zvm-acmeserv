@@ -149,8 +149,14 @@ struct iucv_skb_cb {
 #define SO_MSGLIMIT	0x1000		/* get/set IUCV MSGLIMIT */
 #define SO_MSGSIZE	0x0800		/* get maximum msgsize */
 
+struct iucv_snd2way {
+	void	*answer;	/* answer buffer */
+	size_t	asize;		/* length of answer buffer */
+};
+
 /* iucv related control messages (scm) */
-#define SCM_IUCV_TRGCLS	0x0001		/* target class control message */
+#define SCM_IUCV_TRGCLS		0x0001		/* target class control message */
+#define SCM_IUCV_SND2WAY	0x0002		/* two-way send control message */
 
 struct iucv_sock_list {
 	struct hlist_head head;
